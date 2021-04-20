@@ -78,7 +78,7 @@ def softmax_loss_vectorized(W, X, y, reg):
   scores = np.dot(X,W)  #solution
   scores -= np.max(scores) #solution
   norm = np.sum(np.exp(scores),axis=1).reshape(num_train,1) #solution
-  P = np.exp(scores)/norm
+  P = np.exp(scores)/norm #solution
 
   loss = np.sum(-np.log(P[(np.arange(num_train),y)]))/num_train #solution
   I = np.zeros_like(P) #solution

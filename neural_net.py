@@ -74,9 +74,12 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    a1 = X.dot(W1) + b1 # solution
-    z1 = np.maximum(a1,0)  # solution
-    scores = z1.dot(W2) + b2 # solution
+    #a1 = X.dot(W1) + b1 #solution
+    #z1 = np.maximum(a1,0)  #solution
+    #scores = z1.dot(W2) + b2 #solution
+    fc1 = X.dot(W1) + b1     # fully connected
+    X2 = np.maximum(0, fc1)  # ReLU
+    scores = X2.dot(W2) + b2 # fully connected
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -94,15 +97,23 @@ class TwoLayerNet(object):
     # classifier loss. So that your results match ours, multiply the            #
     # regularization loss by 0.5                                                #
     #############################################################################
-    scores -= np.max(scores,axis=1, keepdims=True) #solution
+   # scores -= np.max(scores,axis=1, keepdims=True) #solution
 
-    norm = np.sum(np.exp(scores),axis=1, keepdims=True) #solution
+   # norm = np.sum(np.exp(scores),axis=1, keepdims=True) #solution
 
-    P = np.exp(scores)/norm #solution
+   # P = np.exp(scores)/norm #solution
 
-    loss = np.sum(-np.log(P[(np.arange(N),y)]))/N #solution
+   # loss = np.sum(-np.log(P[(np.arange(N),y)]))/N #solution
 
-    loss = loss + 0.5*reg*np.sum(W1*W1) + 0.5*reg*np.sum(W2*W2) #solution
+   # loss = loss + 0.5*reg*np.sum(W1*W1) + 0.5*reg*np.sum(W2*W2) #solution
+
+
+    scores -= np.max(scores, axis=1, keepdims=True) # avoid numeric instability
+    scores_exp = np.exp(scores)
+    softmax_matrix = scores_exp / np.sum(scores_exp, axis=1, keepdims=True) 
+    loss = np.sum(-np.log(softmax_matrix[np.arange(N), y]))
+    loss /= N
+    loss += 0.5 *reg * (np.sum(W2 * W2) + np.sum( W1 * W1 )) # regularization
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -115,25 +126,48 @@ class TwoLayerNet(object):
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
      
-    P[(np.arange(N) ,y)] -= 1 # solution
+    #P[(np.arange(N) ,y)] -= 1 #solution
     
-    grads['W2'] = np.dot(z1.T,P) # solution
-    grads['b2'] = np.sum(P,axis=0)/N # solution
+    #grads['W2'] = np.dot(z1.T,P) #solution
+    #grads['b2'] = np.sum(P,axis=0)/N #solution
 
-    d2 = np.heaviside(a1,0) # solution
-    d1 = np.dot(P,W2.T) # solution 
-    d3 = d1*d2 # solution
+    #d2 = np.heaviside(a1,0) #solution
+    #d1 = np.dot(P,W2.T) #solution 
+    #d3 = d1*d2 #solution
 
-    grads['W1'] =  np.dot(X.T,d3) # solution
-    grads['b1'] = np.sum(d3,axis=0)/N # solution
+    #grads['W1'] =  np.dot(X.T,d3) #solution
+    #grads['b1'] = np.sum(d3,axis=0)/N #solution
 
   
-    grads['W1'] /= N # solution
-    grads['W2'] /= N # solution
+    #grads['W1'] /= N
+    #grads['W2'] /= N
 
 
-    grads['W1'] += reg  * W1 # solution
-    grads['W2'] += reg  * W2 # solution
+    #grads['W1'] += reg * 2 * W1 #solution
+    #grads['W2'] += reg * 2 * W2 #solution
+    
+    softmax_matrix[np.arange(N) ,y] -= 1
+    softmax_matrix /= N
+
+    # W2 gradient
+    dW2 = X2.T.dot(softmax_matrix)  # [HxN] * [NxC] = [HxC]
+
+    # b2 gradient
+    db2 = softmax_matrix.sum(axis=0)
+
+    # W1 gradient
+    dW1 = softmax_matrix.dot(W2.T)   # [NxC] * [CxH] = [NxH]
+    dfc1 = dW1 * (fc1>0)             # [NxH] . [NxH] = [NxH]
+    dW1 = X.T.dot(dfc1)            # [DxN] * [NxH] = [DxH]
+
+    # b1 gradient
+    db1 = dfc1.sum(axis=0)
+
+    # regularization gradient
+    dW1 += reg * 2 * W1
+    dW2 += reg * 2 * W2
+
+    grads = {'W1':dW1, 'b1':db1, 'W2':dW2, 'b2':db2}
     
     #############################################################################
     #                              END OF YOUR CODE                             #
@@ -171,7 +205,7 @@ class TwoLayerNet(object):
     train_acc_history = []
     val_acc_history = []
 
-    for it in range(num_iters):
+    for it in xrange(num_iters):
       X_batch = None
       y_batch = None
 
@@ -179,9 +213,7 @@ class TwoLayerNet(object):
       # TODO: Create a random minibatch of training data and labels, storing  #
       # them in X_batch and y_batch respectively.                             #
       #########################################################################
-      batch_indic = np.random.choice(np.arange(num_train), batch_size, replace=True) #solution
-      X_batch = X[batch_indic,:] #solution
-      y_batch = y[batch_indic]  #solution
+      pass
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -196,10 +228,7 @@ class TwoLayerNet(object):
       # using stochastic gradient descent. You'll need to use the gradients   #
       # stored in the grads dictionary defined above.                         #
       #########################################################################
-      self.params['W1'] += -grads['W1']*learning_rate
-      self.params['W2'] += -grads['W2']*learning_rate
-      self.params['b1'] += -grads['b1']*learning_rate
-      self.params['b2'] += -grads['b2']*learning_rate
+      pass
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
@@ -240,15 +269,11 @@ class TwoLayerNet(object):
       to have class c, where 0 <= c < C.
     """
     y_pred = None
-    W1, b1 = self.params['W1'], self.params['b1']
-    W2, b2 = self.params['W2'], self.params['b2']
+
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    a1 = X.dot(W1) + b1 # solution
-    z1 = np.maximum(a1,0)  # solution
-    scores = z1.dot(W2) + b2 # solution
-    y_pred = np.argmax(scores,axis=1) #solution
+    pass
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
